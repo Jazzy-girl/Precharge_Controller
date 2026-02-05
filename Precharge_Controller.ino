@@ -3,9 +3,12 @@ Authors:
 Natu Benyam Demeke
 Violet Enslow
 Ryanne Wilson
+
+
+Precharge Controller
 */
 
-#define ULONG_MAX 4294967295UL
+#define ULONG_MAX 4294967295UL //Serves as a 'null' state for the timers
 
 //pin IDs
 const uint8_t AIR_Precharge = 2; 
@@ -14,7 +17,7 @@ const uint8_t AIR_Discharge = 5;
 const uint8_t LED_Discharge = 9;
 const uint8_t LED_Fault = 10;
 
-const uinst8_t Optocoupler = 14;
+const uint8_t Optocoupler = 14;
 uint8_t BMS = 7;
 uint8_t Switch2 = 8;
 
@@ -33,11 +36,56 @@ unsigned long optocouplerActivatedStart = ULONG_MAX; // The time at which Optoco
 unsigned long dischargeStart = ULONG_MAX;
 const unsigned long dischargeInterval = 7.79e7; // 77.9s; the amount of time it takes to discharge; in millis;
 
+
+// /**
+//  * Author: Ryanne Wilson
+//  * BPS Arduino for Props.
+//  * 
+//  */
+
+// // INCLUDE
+
+// #include <Arduino_CAN.h>
+
+// const int HITEMP_INDEX = 8;
+// const int OFFSET = -40;
+
+// void setup(){
+//   Serial.begin(115200)
+//   while(!Serial);
+
+//   if(!CAN.begin(CanBitRate::BR_250k)){
+//     Serial.println("CAN.begin(...) failed.");
+//     for(;;) {}
+//   }
+// }
+
+// // If MPS is HIGH or Hitemp >= 55, Fault (HIGH; 5V) else output LOW; 0V
+
+// void loop(){
+//   if(CAN.available()){
+//     CanMsg const msg = CAN.read();
+//     Serial.println(msg);
+//     int idMessage = msg.getStandardid();
+//     Serial.print("IDMessage= ");
+//     Serial.println(idMessage);
+
+//     // offset -40
+//     int temp = msg.data[HITEMP_INDEX];
+//     temp -= OFFSET;
+
+//     if (temp >= 55){
+//       // Send out a fault!
+//     }
+    
+//   }
+// }
+
+
 void setup() {
   // put your setup code here, to run once:
   pinMode(AIR_Precharge, OUTPUT);     // Normally open- LOW = open, HIGH = closed
   pinMode(AIR_Main, OUTPUT);          // Normally open
-  pinMode(AIR_Negative, OUTPUT);      // Normally open
   pinMode(AIR_Discharge, OUTPUT);     // Normally open
   //TODO: Add Fault LED
   pinMode(LED_Discharge, OUTPUT);

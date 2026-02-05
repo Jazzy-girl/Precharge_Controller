@@ -13,7 +13,7 @@ No comparator; instead, when switch 2 is flipped, closes the Precharge AIR for 7
 
 //pin IDs
 const uint8_t AIR_Precharge = 5; 
-const uint8_t AIR_Main = 3;
+const uint8_t AIR_Main = 9;
 
 bool carRunning = false; //True when the car can start driving ; as in, when precharging has finished and is successful.
 bool prechargeFailed = false; //True if the precharge failed.
