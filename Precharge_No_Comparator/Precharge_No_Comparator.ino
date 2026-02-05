@@ -13,7 +13,7 @@ No comparator; instead, when switch 2 is flipped, closes the Precharge AIR for 7
 
 //pin IDs
 const uint8_t AIR_Precharge = 5; 
-const uint8_t AIR_Main = 9;
+const uint8_t AIR_Main = 7;
 
 bool carRunning = false; //True when the car can start driving ; as in, when precharging has finished and is successful.
 bool prechargeFailed = false; //True if the precharge failed.
@@ -56,6 +56,7 @@ void loop() {
   if (carRunning == false) {
         if (prechargeStart == ULONG_MAX) {   //if the prechargeStart hasn't yet been assigned         
             digitalWrite(AIR_Precharge, HIGH); //Closes AIR precharge
+            digitalWrite(AIR_Main, LOW);
             prechargeStart = millis();
             }
         precharge();
