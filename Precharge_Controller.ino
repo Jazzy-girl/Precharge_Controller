@@ -42,7 +42,7 @@ Feel free to change any of the output pins!
 
 // input pins
 #define Optocoupler 9     // input_pullup !
-#define BMS_DischargeEn 11   
+#define BMS_DischargeEn 11   // active low
 #define BMS_MPO 12        // BMS Multi-Purpose Output
 #define Feather_Thermistor_Fault 2
 
@@ -55,11 +55,11 @@ bool dischargeFinished = false; // True if the discharge finished!
 //All measurements of time are in milliseconds!
 
 unsigned long initalizeStart = MAX_TIMER; // Start time for waiting for Discharge Enable signal from BMS
-#define initalizeTimeout 5e3 // 0.5s -- amount of time to wait for Discharge Enable to initalize before faulting
+#define initalizeTimeout 5e3 // 5s -- amount of time to wait for Discharge Enable to initalize before faulting
 
 unsigned long prechargeStart = MAX_TIMER; // The time at which precharge started; in millis; MAX_TIMER acts as a 'null' here.
 const unsigned long prechargeTimeoutInterval = 10e4; // 10s ---amount of time that has to pass to mean the precharge failed; in millis
-#define prechargeInterval 1.5e4 // 1.5s -- amount of time necessary to precharge; in millis
+#define prechargeInterval 1.5e3 // 1.5s -- amount of time necessary to precharge; in millis
 bool prechargeTimedOut = false;
 
 unsigned long optocouplerActivatedStart = MAX_TIMER; // The time at which Optocoupler was active; in millis
@@ -67,6 +67,8 @@ unsigned long optocouplerActivatedStart = MAX_TIMER; // The time at which Optoco
 unsigned long dischargeStart = MAX_TIMER;
 #define dischargeInterval 7.79e7 // 77.9s; the amount of time it takes to discharge; in millis;
 
+
+bool optoLow = false;
 
 void setup() {
   // put your setup code here, to run once:
@@ -86,7 +88,7 @@ void setup() {
   // input pins
   pinMode(Optocoupler, INPUT_PULLUP); // Uses internal pullup resistors; default HIGH -> active LOW
   pinMode(BMS_MPO, INPUT);            // Behavior depends on BMS settings
-  pinMode(BMS_DischargeEn, INPUT);
+  pinMode(BMS_DischargeEn, INPUT);    // ACTIVE LOW
   pinMode(Feather_Thermistor_Fault, INPUT);
 
   Serial.begin(9600);
@@ -96,17 +98,20 @@ void setup() {
 
   digitalWrite(AIR_Discharge, HIGH);
 
-  if(!digitalRead(BMS_DischargeEn)) {
+  if(digitalRead(BMS_DischargeEn) != LOW) {
     initalizeStart = millis();
-    while(millis() - initalizeStart < initalizeTimeout) {
-      Serial.println("Waitng for BMS Discharge Enable");
-      delay(100); // added
+    while(digitalRead(BMS_DischargeEn) != LOW){
+      if(millis() - initalizeStart > initalizeTimeout) {
+        Serial.println("Waitng for BMS Discharge Enable");
+        precharge_fault();
+      }
     }
+
   }
-  if(!digitalRead(BMS_DischargeEn)) {
-    Serial.println("Error: BMS Discharge Enable Timeout");
-    precharge_fault();
-  }
+  // if(digitalRead(BMS_DischargeEn)) {
+  //   Serial.println("Error: BMS Discharge Enable Timeout");
+  //   precharge_fault();
+  // }
 
   Serial.println("End of setup");
 
@@ -121,35 +126,53 @@ void precharge() {
   */
 
   unsigned long now = millis();
-  if (digitalRead(Optocoupler) == LOW) { //if Optocoupler is active
-    
-    
-    //This part waits for a steady signal from the optocoupler, 
-    //current duration .5s but that's just a guess.
+  if(digitalRead(Optocoupler) == LOW){
+    optoLow = true;
     if (optocouplerActivatedStart == MAX_TIMER) optocouplerActivatedStart = now;
+  }
+  if(digitalRead(Optocoupler) == HIGH && optoLow == true && !carRunning){
+    digitalWrite(AIR_Precharge, LOW);
+    digitalWrite(AIR_Main, HIGH);
+    carRunning = true;
+  }
 
-    unsigned long chargingInterval = now - optocouplerActivatedStart;
-
-    if (chargingInterval > prechargeInterval) {
-      carRunning = true;
-      digitalWrite(AIR_Precharge, LOW);
-      digitalWrite(AIR_Main, HIGH);
+  if(optocouplerActivatedStart != MAX_TIMER){
+    if(now - optocouplerActivatedStart > 5000){
+      precharge_fault();
     }
-  } 
+  }
+  // if (digitalRead(Optocoupler) == LOW) { //if Optocoupler is active
+    
+    
+  //   //This part waits for a steady signal from the optocoupler, 
+  //   //current duration .5s but that's just a guess.
+  //   if (optocouplerActivatedStart == MAX_TIMER) optocouplerActivatedStart = now;
+
+  //   unsigned long chargingInterval = now - optocouplerActivatedStart;
+
+  //   if (chargingInterval > prechargeInterval) {
+  //     carRunning = true;
+  //     digitalWrite(AIR_Precharge, LOW);
+  //     digitalWrite(AIR_Main, HIGH);
+  //   }
+  // }else { // optocoupler is HIGH (inactive)
+  //   optocouplerActivatedStart = MAX_TIMER;
+  // }
 
   //timeout check
-  unsigned long timeoutInterval = now - prechargeStart;
-  if (timeoutInterval > prechargeTimeoutInterval) { 
-    // Timed out; precharge has failed! fault :(
-    prechargeFailed = true;
-    digitalWrite(AIR_Precharge, LOW);
-    digitalWrite(AIR_Main, LOW);
-    digitalWrite(LED_Fault, HIGH);
-    prechargeTimedOut = true;
-    precharge_fault();
-  }
+  // unsigned long timeoutInterval = now - prechargeStart;
+  // if (timeoutInterval > prechargeTimeoutInterval) { 
+  //   // Timed out; precharge has failed! fault :(
+  //   prechargeFailed = true;
+  //   digitalWrite(AIR_Precharge, LOW);
+  //   digitalWrite(AIR_Main, LOW);
+  //   digitalWrite(LED_Fault, HIGH);
+  //   prechargeTimedOut = true;
+  //   precharge_fault();
+  // }
 }
 
+// unused.
 void discharge() {
   digitalWrite(AIR_Discharge, HIGH);
   unsigned long now = millis();
@@ -173,8 +196,9 @@ void loop() {
   // put your main code here, to run repeatedly:
 
   // Precharge Fault
-  if (digitalRead(BMS_DischargeEn) == LOW 
+  if (digitalRead(BMS_DischargeEn) == HIGH 
       || prechargeTimedOut == true) {
+    Serial.write("BMS Discharge High");
     precharge_fault();
   }
 
@@ -187,7 +211,8 @@ void loop() {
     }
 
   if (carRunning == false) {
-      if (digitalRead(BMS_DischargeEn) == HIGH ) { //&& digitalRead(BMS) == HIGH
+      if (digitalRead(BMS_DischargeEn) == LOW ) { //ACTIVE LOW
+        Serial.write("BMS Discharge Low");
         if (prechargeStart == MAX_TIMER) {   //if the prechargeStart hasn't yet been assigned         
             digitalWrite(AIR_Precharge, HIGH); //Closes AIR precharge
             prechargeStart = millis();
