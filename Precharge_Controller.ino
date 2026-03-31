@@ -130,10 +130,12 @@ void precharge() {
     optoLow = true;
     if (optocouplerActivatedStart == MAX_TIMER) optocouplerActivatedStart = now;
   }
-  if(digitalRead(Optocoupler) == HIGH && optoLow == true && !carRunning){
-    digitalWrite(AIR_Precharge, LOW);
-    digitalWrite(AIR_Main, HIGH);
-    carRunning = true;
+  if(digitalRead(Optocoupler) == HIGH && optoLow == true && !carRunning){ 
+    // if the optocoupler gives a high signal, if the optocoupler has already been low, if the car is not already running:
+    digitalWrite(AIR_Main, HIGH); // Close Main AIR
+    delay(3000); // wait 3 seconds
+    digitalWrite(AIR_Precharge, LOW); // Open Precharge AIR
+    carRunning = true; // the car is now running!
   }
 
   if(optocouplerActivatedStart != MAX_TIMER){
