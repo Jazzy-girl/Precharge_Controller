@@ -2,7 +2,7 @@
 
 #include <Wire.h>
 
-byte tXByte = 0x0123456789ABCDEF01234567;
+byte tXByte = 0x0123456789ABCDEF01234567; // 24 bytes long
 #define address (0x52)
 
 void I2C_TxHandler(void)
