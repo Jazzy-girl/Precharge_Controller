@@ -52,17 +52,21 @@ bool dischargeFinished = false; // True if the discharge finished!
 // All measurements of time are in milliseconds!
 
 unsigned long initalizeStart = MAX_TIMER; // Start time for waiting for Discharge Enable signal from BMS
-#define initalizeTimeout 5e3              // 5s -- amount of time to wait for Discharge Enable to initalize before faulting
+#define initalizeTimeout 5000             // 5s -- amount of time to wait for Discharge Enable to initalize before faulting
 
 unsigned long prechargeStart = MAX_TIMER;            // The time at which precharge started; in millis; MAX_TIMER acts as a 'null' here.
 const unsigned long prechargeTimeoutInterval = 10e4; // 10s ---amount of time that has to pass to mean the precharge failed; in millis
-#define prechargeInterval 1.5e3                      // 1.5s -- amount of time necessary to precharge; in millis
+#define prechargeInterval 1500                      // 1.5s -- amount of time necessary to precharge; in millis
 bool prechargeTimedOut = false;
 
 unsigned long optocouplerActivatedStart = MAX_TIMER; // The time at which Optocoupler was active; in millis
 
 unsigned long dischargeStart = MAX_TIMER;
-#define dischargeInterval 7.79e7 // 77.9s; the amount of time it takes to discharge; in millis;
+#define dischargeInterval 77900 // 77.9s; the amount of time it takes to discharge; in millis;
+
+#define optoHighInterval 500 // amount of time to ensure optocoupler is not just flicking high
+
+unsigned long optoHighStart = MAX_TIMER;
 
 bool optoLow = false;
 
@@ -127,18 +131,31 @@ void precharge()
   if (digitalRead(Optocoupler) == LOW)
   {
     optoLow = true;
+    optoHighStart = MAX_TIMER;
     if (optocouplerActivatedStart == MAX_TIMER)
+    {
       Serial.println("Optocoupler is LOW");
       optocouplerActivatedStart = now;
+    }
   }
+
   if (digitalRead(Optocoupler) == HIGH && optoLow == true && !carRunning)
   {
-    Serial.println("Optocoupler read high and car is running!");
-    // if the optocoupler gives a high signal, if the optocoupler has already been low, if the car is not already running:
-    digitalWrite(AIR_Main, HIGH);     // Close Main AIR
-    delay(3000);                      // wait 3 seconds
-    digitalWrite(AIR_Precharge, LOW); // Open Precharge AIR
-    carRunning = true;                // the car is now running!
+    if(optoHighStart == MAX_TIMER){
+      optoHighStart = millis();
+      Serial.println("Optocoupler went HIGH again!");
+    }
+
+    if(now - optoHighStart > optoHighInterval){
+      Serial.println("Optocoupler read HIGH without flicking for 0.5 seconds and car is running!");
+      // if the optocoupler gives a high signal, if the optocoupler has already been low, if the car is not already running:
+      digitalWrite(AIR_Main, HIGH);     // Close Main AIR
+      Serial.println("CLOSED MAIN AIR");
+      delay(3000);                      // wait 3 seconds
+      digitalWrite(AIR_Precharge, LOW); // Open Precharge AIR
+      Serial.println("OPENED PRECHARGE AIR");
+      carRunning = true;                // the car is now running!
+    }
   }
 
   if (optocouplerActivatedStart != MAX_TIMER)
@@ -193,7 +210,7 @@ void discharge()
 
 void precharge_fault()
 {
-  Serial.println("PRECHARGE FAULT TRIGGERED");
+  Serial.println("PRECHARGE FAULT TRIGGERED (opening MAIN and Precharge)");
   digitalWrite(AIR_Main, LOW);       // open Main AIR
   digitalWrite(AIR_Discharge, HIGH); // close Discharge
   digitalWrite(AIR_Precharge, LOW); // Open Precharge AIR
@@ -250,6 +267,7 @@ void loop()
       {       
         Serial.println("BMS Discharge Low");                             // if the prechargeStart hasn't yet been assigned
         digitalWrite(AIR_Precharge, HIGH); // Closes AIR precharge
+        Serial.println("CLOSED AIR PRECHARGE");
         prechargeStart = millis();
       }
       precharge();
